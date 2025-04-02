@@ -2,15 +2,14 @@
 session_start();
 require 'proses/functions.php';
 
-// Cek jika user belum login
+// Check if user is logged in
 if (!isset($_SESSION["login"])) {
     header("Location: login/login.php");
     exit;
 }
 
-// Pastikan user_id/id tersedia (sesuaikan dengan login.php)
+// Get user ID from session
 $user_id = $_SESSION["user_id"] ?? $_SESSION["id"] ?? null;
-
 if (!$user_id) {
     echo "User ID not found. Please log in again.";
     session_destroy();
@@ -18,35 +17,41 @@ if (!$user_id) {
     exit;
 }
 
-// Logika cart
+// Add to cart functionality
 if (isset($_POST['add_to_cart'])) {
-    $product_name = mysqli_real_escape_string($conn, $_POST['product_name']);
-    $product_price = (float)$_POST['product_price'];
-    $product_image = mysqli_real_escape_string($conn, $_POST['product_image']);
-    $product_quantity = 1;
-
-    // Gunakan prepared statement untuk keamanan
-    $select_cart = $conn->prepare("SELECT * FROM `cart` WHERE name = ? AND user_id = ?");
-    $select_cart->bind_param("si", $product_name, $user_id);
-    $select_cart->execute();
-    $result = $select_cart->get_result();
+    $product_id = (int)$_POST['product_id'];
+    $quantity = 1; // Default quantity
+    
+    // Check if product already in cart
+    $check_cart = $conn->prepare("SELECT * FROM `cart` WHERE user_id = ? AND product_id = ?");
+    $check_cart->bind_param("ii", $user_id, $product_id);
+    $check_cart->execute();
+    $result = $check_cart->get_result();
 
     if ($result->num_rows > 0) {
-        echo "<script>alert('Barang telah ada di keranjang');</script>";
+        echo "<script>alert('Product already in cart');</script>";
     } else {
-        $insert = $conn->prepare("INSERT INTO `cart` (name, price, image, quantity, user_id) VALUES (?, ?, ?, ?, ?)");
-        $insert->bind_param("sdsii", $product_name, $product_price, $product_image, $product_quantity, $user_id);
+        // Get product details
+        $product_query = $conn->prepare("SELECT name, price, image FROM `products` WHERE id = ?");
+        $product_query->bind_param("i", $product_id);
+        $product_query->execute();
+        $product = $product_query->get_result()->fetch_assoc();
         
-        if ($insert->execute()) {
-            echo "<script>alert('Barang berhasil di tambahkan');</script>";
+        if ($product) {
+            $insert = $conn->prepare("INSERT INTO `cart` (user_id, product_id, quantity) VALUES (?, ?, ?)");
+            $insert->bind_param("iii", $user_id, $product_id, $quantity);
+            
+            if ($insert->execute()) {
+                echo "<script>alert('Product added to cart');</script>";
+            } else {
+                echo "<script>alert('Error: ".$conn->error."');</script>";
+            }
         } else {
-            echo "<script>alert('Error: ".$conn->error."');</script>";
+            echo "<script>alert('Product not found');</script>";
         }
     }
 }
 ?>
-
-
 
 
 <!DOCTYPE html>
@@ -93,20 +98,16 @@ if (isset($_POST['add_to_cart'])) {
 		<div class="icons">
 			<div class="fas fa-shopping-cart" id="cart-btn">
 				<?php
-
-				$select_rows = mysqli_query($conn, "SELECT * FROM `cart`") or die('query failed');
-				$row_count = mysqli_num_rows($select_rows);
-
+				$cart_count = $conn->prepare("SELECT COUNT(*) as count FROM `cart` WHERE user_id = ?");
+				$cart_count->bind_param("i", $user_id);
+				$cart_count->execute();
+				$count = $cart_count->get_result()->fetch_assoc()['count'];
 				?>
-
 				<a href="cart.php" class="cart_row">
-					<span>
-						<?php echo $row_count; ?>
-					</span>
+					<span><?php echo $count; ?></span>
 				</a>
 			</div>
 			<div class="fas fa-bars" id="menu-btn"></div>
-			<div class="cart"></div>
 		</div>
 	</header>
 
@@ -137,52 +138,51 @@ if (isset($_POST['add_to_cart'])) {
 		</div>
 	</section>
 	<!-- about section ends -->
-	<!--  menu section starts -->
+
+	<!-- menu section starts -->
 	<section class="menu" id="menu">
 		<h1 class="heading"><span>our</span> menu</h1>
 
 		<form action="#menu" method="post" class="search-form">
-			<input type="text" name="searchTerm" placeholder="Cari menu...">
-			<input type="submit" name="search" value="Cari">
+			<input type="text" name="searchTerm" placeholder="Search menu...">
+			<input type="submit" name="search" value="Search">
 		</form>
 
 		<div class="box-container">
 			<?php
 			if (isset($_POST['search'])) {
-				$searchTerm = $_POST['searchTerm'];
-
-				// Lakukan pencarian
-				$select_products = mysqli_query($conn, "SELECT * FROM `products` WHERE `name` LIKE '%$searchTerm%'");
+				$searchTerm = mysqli_real_escape_string($conn, $_POST['searchTerm']);
+				$select_products = $conn->prepare("SELECT * FROM `products` WHERE `name` LIKE ?");
+				$searchTerm = "%$searchTerm%";
+				$select_products->bind_param("s", $searchTerm);
+				$select_products->execute();
+				$select_products = $select_products->get_result();
 			} else {
-				// Tampilkan semua produk jika tidak ada pencarian
 				$select_products = mysqli_query($conn, "SELECT * FROM `products`");
 			}
 
 			if (mysqli_num_rows($select_products) > 0) {
 				while ($fetch_product = mysqli_fetch_assoc($select_products)) {
 			?>
-
 					<form action="" method="post">
 						<div class="box">
-							<img src="images/<?php echo $fetch_product['image']; ?>" alt="">
-							<h3><?php echo $fetch_product['name']; ?></h3>
-							<div class="price">Rp<?php echo $fetch_product['price']; ?>/-</div>
-							<input type="hidden" name="product_name" value="<?php echo $fetch_product['name']; ?>">
-							<input type="hidden" name="product_price" value="<?php echo $fetch_product['price']; ?>">
-							<input type="hidden" name="product_image" value="<?php echo $fetch_product['image']; ?>">
+							<img src="images/<?php echo htmlspecialchars($fetch_product['image']); ?>" alt="<?php echo htmlspecialchars($fetch_product['name']); ?>">
+							<h3><?php echo htmlspecialchars($fetch_product['name']); ?></h3>
+							<div class="price">Rp<?php echo number_format($fetch_product['price'], 0, ',', '.'); ?></div>
+							<input type="hidden" name="product_id" value="<?php echo $fetch_product['id']; ?>">
 							<input type="submit" class="btn" value="add to cart" name="add_to_cart">
 						</div>
 					</form>
-
 			<?php
 				}
 			} else {
-				echo "<script>alert('Menu tidak tersedia'); window.location.href='index.php';</script>";
+				echo "<p class='empty'>No products found</p>";
 			}
 			?>
 		</div>
 	</section>
-	<!--  menu section ends -->
+	<!-- menu section ends -->
+
 	<!-- products section starts -->
 	<section class="products" id="products">
 		<h1 class="heading">our <span> products </span></h1>

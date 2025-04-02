@@ -82,3 +82,10 @@ function is_logged_in() {
 function get_user_id() {
     return $_SESSION["user_id"] ?? $_SESSION["id"] ?? null;
 }
+
+$conn->set_charset("utf8mb4");
+
+//Function to sanitize inputs (add more checks as needed)
+function sanitizeInput($conn, $data){
+    return $conn->real_escape_string(trim($data));
+}

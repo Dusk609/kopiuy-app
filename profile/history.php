@@ -2,6 +2,12 @@
 require '../proses/functions.php';
 session_start();
 
+// Handle messages
+$success = $_SESSION['success'] ?? '';
+$error = $_SESSION['error'] ?? '';
+unset($_SESSION['success']);
+unset($_SESSION['error']);
+
 if (!isset($_SESSION["login"]) || !isset($_SESSION['id'])) {
     header("Location: ../login/login.php");
     exit;
@@ -10,11 +16,14 @@ if (!isset($_SESSION["login"]) || !isset($_SESSION['id'])) {
 $user_id = $_SESSION['id'];
 $user_id = mysqli_real_escape_string($conn, $user_id);
 
-// Get orders with address information
+// Get orders with address and item information
 $orders_query = mysqli_query($conn, "
-    SELECT o.*, 
-           a.jalan, a.alamat, a.kota, a.provinsi, a.negara, a.pos_kode,
-           CONCAT(a.jalan, ', ', a.alamat, ', ', a.kota, ', ', a.provinsi, ', ', a.negara, ' ', a.pos_kode) as shipping_address
+    SELECT 
+        o.*, 
+        a.jalan, a.alamat, a.kota, a.provinsi, a.negara, a.pos_kode,
+        CONCAT(a.jalan, ', ', a.alamat, ', ', a.kota, ', ', a.provinsi, ', ', a.negara, ' ', a.pos_kode) as shipping_address,
+        (SELECT SUM(quantity) FROM order_items WHERE order_id = o.id) as total_items,
+        (SELECT GROUP_CONCAT(CONCAT(quantity, 'x ', product_name) SEPARATOR ' | ') FROM order_items WHERE order_id = o.id) as product_summary
     FROM `order` o
     LEFT JOIN addresses a ON o.address_id = a.id
     WHERE o.user_id = '$user_id'
@@ -105,12 +114,17 @@ if (!$orders_query) {
             color: var(--black);
         }
 
-        .status-accepted {
+        .status-processing {
+            background: #2196F3;
+            color: var(--white);
+        }
+
+        .status-completed {
             background: #4CAF50;
             color: var(--white);
         }
 
-        .status-rejected {
+        .status-cancelled {
             background: #F44336;
             color: var(--white);
         }
@@ -167,6 +181,10 @@ if (!$orders_query) {
             font-size: 1.4rem;
             border-radius: .5rem;
             cursor: pointer;
+            border: none;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
         }
 
         .btn-primary {
@@ -184,6 +202,26 @@ if (!$orders_query) {
             padding: 5rem 0;
             font-size: 1.8rem;
             color: var(--white);
+        }
+
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .alert-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .alert-danger {
+            background: #F44336;
+            color: white;
+        }
+
+        .cancel-form {
+            display: inline;
         }
     </style>
 </head>
@@ -226,6 +264,18 @@ if (!$orders_query) {
                 <h1>Riwayat Pesanan</h1>
             </div>
             
+            <?php if (!empty($success)): ?>
+                <div class="alert alert-success">
+                    <?= htmlspecialchars($success) ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if (!empty($error)): ?>
+                <div class="alert alert-danger">
+                    <?= htmlspecialchars($error) ?>
+                </div>
+            <?php endif; ?>
+            
             <div class="order-list">
                 <?php if (mysqli_num_rows($orders_query) > 0): ?>
                     <?php while($order = mysqli_fetch_assoc($orders_query)): ?>
@@ -234,49 +284,72 @@ if (!$orders_query) {
                             <?php 
                             $status_class = '';
                             $status_text = '';
-                            if ($order['status'] == 'pending') {
-                                $status_class = 'status-pending';
-                                $status_text = 'Menunggu Respon Admin';
-                            } elseif ($order['status'] == 'accepted') {
-                                $status_class = 'status-accepted';
-                                $status_text = 'Diterima';
-                            } elseif ($order['status'] == 'rejected') {
-                                $status_class = 'status-rejected';
-                                $status_text = 'Ditolak';
+                            switch ($order['status']) {
+                                case 'pending':
+                                    $status_class = 'status-pending';
+                                    $status_text = 'Menunggu Konfirmasi';
+                                    break;
+                                case 'processing':
+                                    $status_class = 'status-processing';
+                                    $status_text = 'Diproses';
+                                    break;
+                                case 'completed':
+                                    $status_class = 'status-completed';
+                                    $status_text = 'Selesai';
+                                    break;
+                                case 'cancelled':
+                                    $status_class = 'status-cancelled';
+                                    $status_text = 'Dibatalkan';
+                                    break;
+                                default:
+                                    $status_class = 'status-pending';
+                                    $status_text = $order['status'];
                             }
                             ?>
                             <span class="order-status <?= $status_class ?>"><?= $status_text ?></span>
                             
                             <div class="order-header">
-                                <div class="order-id">Order #<?= htmlspecialchars($order['id'] ?? '') ?></div>
-                                <div class="order-date"><?= isset($order['order_date']) ? date('d M Y H:i', strtotime($order['order_date'])) : 'N/A' ?></div>
+                                <div class="order-id">Pesanan #<?= $order['id'] ?></div>
+                                <div class="order-date">
+                                    <?= date('d M Y H:i', strtotime($order['created_at'])) ?>
+                                </div>
                             </div>
                             
                             <div class="order-details">
                                 <div class="order-summary">
-                                    <p><strong>Jumlah Item:</strong> <?= htmlspecialchars($order['item_count'] ?? '0') ?></p>
-                                    <p><strong>Total Harga:</strong> Rp <?= isset($order['total_price']) ? number_format($order['total_price'], 0, ',', '.') : '0' ?></p>
-                                    <p><strong>Metode Pembayaran:</strong> <?= isset($order['payment_method']) ? ucfirst($order['payment_method']) : 'N/A' ?></p>
+                                    <p><strong>Jumlah Item:</strong> <?= $order['total_items'] ?? $order['item_count'] ?></p>
+                                    <p><strong>Total Harga:</strong> Rp <?= number_format($order['total_price'], 0, ',', '.') ?></p>
+                                    <p><strong>Metode Pembayaran:</strong> <?= ucfirst($order['payment_method']) ?></p>
+                                    <p><strong>Status:</strong> <?= $status_text ?></p>
                                     <p><strong>Alamat Pengiriman:</strong></p>
-                                    <p><?= isset($order['shipping_address']) ? htmlspecialchars($order['shipping_address']) : 'Alamat tidak tersedia' ?></p>
+                                    <p><?= $order['shipping_address'] ?? 'Alamat tidak tersedia' ?></p>
                                 </div>
                                 
                                 <div class="order-items">
                                     <h3>Item Pesanan</h3>
                                     <ul class="item-list">
                                         <?php 
-                                        // Ambil detail item pesanan
                                         $items_query = mysqli_query($conn, "
-                                            SELECT oi.*, p.name as product_name 
+                                            SELECT oi.*, p.image 
                                             FROM order_items oi
                                             LEFT JOIN products p ON oi.product_id = p.id
-                                            WHERE oi.order_id = '{$order['id']}'
+                                            WHERE order_id = '{$order['id']}'
                                         ");
                                         
                                         while($item = mysqli_fetch_assoc($items_query)):
                                         ?>
                                             <li>
-                                                <span><?= htmlspecialchars($item['product_name']) ?> (x<?= $item['quantity'] ?>)</span>
+                                                <div style="display: flex; align-items: center; gap: 10px;">
+                                                    <?php if(!empty($item['image'])): ?>
+                                                        <img src="../images/<?= $item['image'] ?>" width="50" height="50" style="border-radius: 50%;">
+                                                    <?php endif; ?>
+                                                    <div>
+                                                        <span><?= htmlspecialchars($item['product_name']) ?></span>
+                                                        <div style="font-size: 0.9em;">
+                                                            x<?= $item['quantity'] ?> @ Rp<?= number_format($item['price'], 0, ',', '.') ?>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 <span>Rp <?= number_format($item['price'] * $item['quantity'], 0, ',', '.') ?></span>
                                             </li>
                                         <?php endwhile; ?>
@@ -286,14 +359,14 @@ if (!$orders_query) {
                             
                             <div class="order-actions">
                                 <?php if ($order['status'] == 'pending'): ?>
-                                    <a href="cancel_order.php?id=<?= $order['id'] ?>" class="btn btn-danger" onclick="return confirm('Yakin ingin membatalkan pesanan ini?');">
-                                        <i class="fas fa-times"></i> Batalkan
-                                    </a>
+                                    <form action="cancel_order.php" method="POST" class="cancel-form">
+                                        <input type="hidden" name="order_id" value="<?= $order['id'] ?>">
+                                        <button type="submit" class="btn btn-danger" onclick="return confirm('Yakin ingin membatalkan pesanan ini?');">
+                                            <i class="fas fa-times"></i> Batalkan
+                                        </button>
+                                    </form>
                                 <?php endif; ?>
                                 
-                                <a href="order_detail.php?id=<?= $order['id'] ?>" class="btn btn-primary">
-                                    <i class="fas fa-eye"></i> Detail
-                                </a>
                             </div>
                         </div>
                     <?php endwhile; ?>
