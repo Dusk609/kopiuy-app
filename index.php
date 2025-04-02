@@ -1,32 +1,53 @@
 <?php
-
+session_start();
 require 'proses/functions.php';
 
-session_start();
-
+// Cek jika user belum login
 if (!isset($_SESSION["login"])) {
-	header("Location: login/login.php");
-	exit;
+    header("Location: login/login.php");
+    exit;
 }
 
+// Pastikan user_id/id tersedia (sesuaikan dengan login.php)
+$user_id = $_SESSION["user_id"] ?? $_SESSION["id"] ?? null;
+
+if (!$user_id) {
+    echo "User ID not found. Please log in again.";
+    session_destroy();
+    header("Location: login/login.php");
+    exit;
+}
+
+// Logika cart
 if (isset($_POST['add_to_cart'])) {
+    $product_name = mysqli_real_escape_string($conn, $_POST['product_name']);
+    $product_price = (float)$_POST['product_price'];
+    $product_image = mysqli_real_escape_string($conn, $_POST['product_image']);
+    $product_quantity = 1;
 
-	$product_name = $_POST['product_name'];
-	$product_price = $_POST['product_price'];
-	$product_image = $_POST['product_image'];
-	$product_quantity = 1;
+    // Gunakan prepared statement untuk keamanan
+    $select_cart = $conn->prepare("SELECT * FROM `cart` WHERE name = ? AND user_id = ?");
+    $select_cart->bind_param("si", $product_name, $user_id);
+    $select_cart->execute();
+    $result = $select_cart->get_result();
 
-	$select_cart = mysqli_query($conn, "SELECT * FROM `cart` WHERE name = '$product_name'");
-
-	if (mysqli_num_rows($select_cart) > 0) {
-		echo "<script>alert('Barang telah ada di keranjang');</script>";
-	} else {
-		$insert_product = mysqli_query($conn, "INSERT INTO `cart`(name, price, image, quantity) VALUES('$product_name', '$product_price', '$product_image', '$product_quantity')");
-		echo "<script>alert('Barang berhasil di tambahkan');</script>";
-	}
+    if ($result->num_rows > 0) {
+        echo "<script>alert('Barang telah ada di keranjang');</script>";
+    } else {
+        $insert = $conn->prepare("INSERT INTO `cart` (name, price, image, quantity, user_id) VALUES (?, ?, ?, ?, ?)");
+        $insert->bind_param("sdsii", $product_name, $product_price, $product_image, $product_quantity, $user_id);
+        
+        if ($insert->execute()) {
+            echo "<script>alert('Barang berhasil di tambahkan');</script>";
+        } else {
+            echo "<script>alert('Error: ".$conn->error."');</script>";
+        }
+    }
 }
-
 ?>
+
+
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -66,8 +87,7 @@ if (isset($_POST['add_to_cart'])) {
 			<a href="#review">review</a>
 			<a href="#contact">contact</a>
 			<a href="#blogs">blogs</a>
-			<a href="#profile">profile</a>
-			<a href="login/logout.php">Log Out</a>
+			<a href="profile/profile.php">profile</a>
 		</nav>
 
 		<div class="icons">
@@ -88,10 +108,6 @@ if (isset($_POST['add_to_cart'])) {
 			<div class="fas fa-bars" id="menu-btn"></div>
 			<div class="cart"></div>
 		</div>
-
-		
-
-		
 	</header>
 
 	<!-- header section ends -->
@@ -361,7 +377,6 @@ if (isset($_POST['add_to_cart'])) {
 	<!-- blog section ends -->
 
 	<!-- footer section starts -->
-
 	<section class="footer">
 
 		<div class="share">

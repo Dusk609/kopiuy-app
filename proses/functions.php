@@ -39,7 +39,7 @@ function signup($data)
     $password = password_hash($password, PASSWORD_DEFAULT);
 
     // Tambah user baru ke db
-    mysqli_query($conn, "INSERT INTO users VALUES('', '$username', '$email', '$password')");
+    mysqli_query($conn, "INSERT INTO users (username, email, password) VALUES ('$username', '$email', '$password')");
     return mysqli_affected_rows($conn);
 }
 
@@ -51,4 +51,34 @@ function search($keyword)
                 quantity LIKE '%$keyword%'
     ";
     return query($query);
+}
+
+function login($username, $password) {
+    global $conn;
+    
+    $username = mysqli_real_escape_string($conn, $username);
+    $query = "SELECT * FROM users WHERE username = '$username'";
+    $result = mysqli_query($conn, $query);
+    
+    if (mysqli_num_rows($result) === 1) {
+        $user = mysqli_fetch_assoc($result);
+        if (password_verify($password, $user['password'])) {
+            // Set session
+            $_SESSION['login'] = true;
+            $_SESSION['id'] = $user['id']; // Pastikan ini sesuai dengan kolom di tabel
+            $_SESSION['username'] = $user['username'];
+            return true;
+        }
+    }
+    return false;
+}
+
+function is_logged_in() {
+    session_start();
+    return isset($_SESSION["login"]) && 
+          (isset($_SESSION["user_id"]) || isset($_SESSION["id"]));
+}
+
+function get_user_id() {
+    return $_SESSION["user_id"] ?? $_SESSION["id"] ?? null;
 }

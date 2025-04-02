@@ -1,19 +1,18 @@
 <?php
-
 require 'proses/functions.php';
-
 session_start();
-
 
 if (!isset($_SESSION["login"])) {
     header("Location: login/login.php");
     exit;
 }
 
+$user_id = $_SESSION['id']; // Ambil user_id dari session
+
 if (isset($_POST['update_update_btn'])) {
     $update_value = $_POST['update_quantity'];
     $update_id = $_POST['update_quantity_id'];
-    $update_quantity_query = mysqli_query($conn, "UPDATE `cart` SET quantity = '$update_value' WHERE id = '$update_id'");
+    $update_quantity_query = mysqli_query($conn, "UPDATE `cart` SET quantity = '$update_value' WHERE id = '$update_id' AND user_id = '$user_id'");
     if ($update_quantity_query) {
         header('location:cart.php');
     };
@@ -21,15 +20,18 @@ if (isset($_POST['update_update_btn'])) {
 
 if (isset($_GET['remove'])) {
     $remove_id = $_GET['remove'];
-    mysqli_query($conn, "DELETE FROM `cart` WHERE id = '$remove_id'");
+    mysqli_query($conn, "DELETE FROM `cart` WHERE id = '$remove_id' AND user_id = '$user_id'");
     header('location:cart.php');
 };
 
 if (isset($_GET['delete_all'])) {
-    mysqli_query($conn, "DELETE FROM `cart`");
+    mysqli_query($conn, "DELETE FROM `cart` WHERE user_id = '$user_id'");
     header('location:cart.php');
 }
 
+// Hitung jumlah item di cart untuk user ini
+$cart_count = mysqli_query($conn, "SELECT COUNT(*) as count FROM `cart` WHERE user_id = '$user_id'");
+$cart_count = mysqli_fetch_assoc($cart_count)['count'];
 ?>
 
 <!DOCTYPE html>
@@ -64,10 +66,10 @@ if (isset($_GET['delete_all'])) {
             <a href="index.php#review">review</a>
             <a href="index.php#contact">contact</a>
             <a href="index.php#blogs">blogs</a>
+            <a href="#profile">profile</a>
         </nav>
 
         <div class="icons">
-            <div class="fas fa-search" id="search-btn"></div>
             <div class="fas fa-shopping-cart" id="cart-btn">
                 <?php
 
@@ -87,25 +89,17 @@ if (isset($_GET['delete_all'])) {
 
             </div>
         </div>
-
-        <div class="search-form">
-            <input type="search" id="search-box" placeholder="search here...">
-            <label for="search-box" class="fas fa-search"></label>
-        </div>
     </header>
 
     <!-- header section ends -->
 
     <!-- Cart Start -->
     <div class="container">
-
         <section class="shopping-cart">
-
             <br><br><br><br><br><br><br><br><br><br>
             <h1 class="heading">shopping <span>cart</span></h1>
 
             <table>
-
                 <thead>
                     <th>gambar</th>
                     <th>nama</th>
@@ -116,15 +110,12 @@ if (isset($_GET['delete_all'])) {
                 </thead>
 
                 <tbody>
-
                     <?php
-
-                    $select_cart = mysqli_query($conn, "SELECT * FROM `cart`");
+                    $select_cart = mysqli_query($conn, "SELECT * FROM `cart` WHERE user_id = '$user_id'");
                     $grand_total = 0;
                     if (mysqli_num_rows($select_cart) > 0) {
                         while ($fetch_cart = mysqli_fetch_assoc($select_cart)) {
                     ?>
-
                             <tr>
                                 <td><img src="images/<?php echo $fetch_cart['image']; ?>" height="100" alt=""></td>
                                 <td><?php echo $fetch_cart['name']; ?></td>
@@ -145,22 +136,18 @@ if (isset($_GET['delete_all'])) {
                     };
                     ?>
                     <tr class="table-bottom">
-                        <td><a href="products.php" class="option-btn" style="margin-top: 0;">Kembali ke Toko</a></td>
+                        <td><a href="index.php#menu" class="option-btn" style="margin-top: 0;">Kembali ke Toko</a></td>
                         <td colspan="3">Total Harga</td>
                         <td>Rp<?php echo $grand_total; ?>.000/-</td>
                         <td><a href="cart.php?delete_all" onclick="return confirm('Apakah anda ingin mengulang pesanan?');" class="delete-btn"> <i class="fas fa-trash"></i> Hapus Semua </a></td>
                     </tr>
-
                 </tbody>
-
             </table>
 
             <div class="checkout-btn">
                 <a href="checkout.php" class="btn <?= ($grand_total > 1) ? '' : 'disabled'; ?>">Checkout</a>
             </div>
-
         </section>
-
     </div>
     <!-- Cart End -->
 

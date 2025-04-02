@@ -1,42 +1,57 @@
 <?php
-
 session_start();
 
-if (isset($_SESSION["login"])) {
-    header("Location; ../index.php");
+
+
+// Debug: Lihat session yang ada
+// echo "<pre>"; print_r($_SESSION); echo "</pre>"; exit;
+
+// Periksa apakah sudah login
+if (isset($_SESSION["login"]) && $_SESSION["login"] === true) {
+    header("Location: ../index.php");
     exit;
 }
 
 require '../proses/functions.php';
 
 if (isset($_POST["login"])) {
-    $username = $_POST["username"];
-    $password = $_POST["password"];
+    $username = mysqli_real_escape_string($conn, $_POST["username"]);
+    $password = $_POST["password"]; // Tidak perlu escape untuk password
 
-    $result = mysqli_query($conn, "SELECT * FROM users WHERE username = '$username'");
+    // Gunakan prepared statement
+    $stmt = $conn->prepare("SELECT * FROM users WHERE username = ?");
+    $stmt->bind_param("s", $username);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-    // cek username
-    if (mysqli_num_rows($result) === 1) {
-
-        // cek password
-        $row = mysqli_fetch_assoc($result);
+    if ($result->num_rows === 1) {
+        $row = $result->fetch_assoc();
+        
         if (password_verify($password, $row["password"])) {
             // Set session
+            $_SESSION = []; // Clear existing session
             $_SESSION["login"] = true;
-
+            $_SESSION["id"] = $row["id"];
+            $_SESSION["username"] = $row["username"];
+            $_SESSION["email"] = $row["email"];
+            
+            // Regenerate session ID untuk security
+            session_regenerate_id(true);
+            
+            // Debug: Cek session sebelum redirect
+            // echo "<pre>"; print_r($_SESSION); echo "</pre>"; exit;
+            
             header("Location: ../index.php");
             exit;
         }
     }
-
+    
     $error = true;
 }
-
 ?>
 
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -47,7 +62,6 @@ if (isset($_POST["login"])) {
 </head>
 
 <body>
-
     <div class="login-card-container">
         <div class="login-card">
             <div class="login-card-logo">
@@ -58,12 +72,10 @@ if (isset($_POST["login"])) {
                 <div>Please Sign In to use platform</div>
             </div>
             <form class="login-card-form" action="" method="post">
-                <!-- Email -->
                 <div class="form-item">
                     <span class="form-item-icon material-symbols-rounded">mail</span>
                     <input type="text" placeholder="Username" name="username" required autofocus>
                 </div>
-                <!-- Password -->
                 <div class="form-item">
                     <span class="form-item-icon material-symbols-rounded">lock</span>
                     <input type="password" placeholder="Password" name="password" required>
@@ -107,7 +119,5 @@ if (isset($_POST["login"])) {
             </div>
         </div>
     </div>
-
 </body>
-
 </html>

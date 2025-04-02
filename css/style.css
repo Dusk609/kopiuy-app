@@ -75,6 +75,11 @@ section{
     cursor: pointer;
 }
 
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .btn:hover{
     letter-spacing: .2rem;
 }
@@ -649,6 +654,232 @@ section{
 }
 
 
+/* Profile Section */
+.profile {
+    padding: 2rem 7%;
+    margin-top: 9.5rem; /* Sesuaikan dengan tinggi header */
+    color: var(--white);
+}
+
+.profile-container {
+    max-width: 1500px;
+    margin: 0 auto;
+}
+
+.profile-card {
+    background: var(--black);
+    border: var(--border);
+    border-radius: .5rem;
+    padding: 3rem;
+    margin-bottom: 3rem;
+}
+
+.profile-card h2 {
+    font-size: 3rem;
+    color: var(--main-color);
+    margin-bottom: 2rem;
+    text-transform: uppercase;
+}
+
+.profile-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(30rem, 1fr));
+    gap: 3rem;
+}
+
+.profile-group {
+    margin-bottom: 2rem;
+}
+
+.profile-group h3 {
+    font-size: 2rem;
+    color: var(--main-color);
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+}
+
+.profile-group p {
+    font-size: 1.6rem;
+    color: var(--white);
+    padding: 1rem;
+    border-bottom: var(--border);
+}
+
+.profile-actions {
+    margin-top: 3rem;
+}
+
+.profile-actions .btn {
+    background: var(--main-color);
+    color: var(--black);
+    font-weight: bold;
+    margin-right: 1rem;
+}
+
+.profile-actions .btn:hover {
+    background: var(--white);
+    color: var(--black);
+}
+
+/* Profile Address Preview */
+.address-preview {
+    font-size: 1.6rem;
+    color: var(--white);
+    padding: 1rem;
+    border: var(--border);
+    border-radius: .5rem;
+    margin-bottom: 1rem;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.address-preview p {
+    margin: 0.5rem 0;
+    line-height: 1.5;
+}
+
+.profile-actions .btn i {
+    margin-right: 0.5rem;
+}
+
+/* Profile Page */
+.profile-section {
+    padding: 2rem 7%;
+    margin-top: 9.5rem;
+    color: var(--white);
+}
+
+.address-card {
+    background: var(--black);
+    border: var(--border);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: .5rem;
+    position: relative;
+}
+
+.default-badge {
+    background: var(--main-color);
+    color: var(--black);
+    padding: 0.3rem 1rem;
+    border-radius: 3rem;
+    font-size: 1.2rem;
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+}
+
+.address-actions {
+    margin-top: 1rem;
+    display: flex;
+    gap: 1rem;
+}
+
+/* History Section */
+.order-history {
+    background: var(--black);
+    border: var(--border);
+    border-radius: .5rem;
+    padding: 3rem;
+}
+
+.order-history h2 {
+    font-size: 3rem;
+    color: var(--main-color);
+    margin-bottom: 2rem;
+    text-transform: uppercase;
+}
+
+.order-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.order-table th {
+    background: var(--main-color);
+    color: var(--black);
+    padding: 1.5rem;
+    font-size: 1.8rem;
+    text-align: left;
+}
+
+.order-table td {
+    padding: 1.5rem;
+    font-size: 1.6rem;
+    color: var(--white);
+    border-bottom: var(--border);
+}
+
+.order-status {
+    padding: 0.5rem 1.5rem;
+    border-radius: 3rem;
+    font-weight: bold;
+}
+
+.order-status.completed {
+    background: rgba(0, 255, 0, 0.1);
+    color: #00ff00;
+}
+
+.order-status.processing {
+    background: rgba(255, 255, 0, 0.1);
+    color: #ffff00;
+}
+
+.order-status.pending {
+    background: rgba(255, 165, 0, 0.1);
+    color: #ffa500;
+}
+
+.order-status.cancelled {
+    background: rgba(255, 0, 0, 0.1);
+    color: #ff0000;
+}
+
+.order-action {
+    color: var(--main-color);
+    font-size: 1.6rem;
+}
+
+.order-action:hover {
+    text-decoration: underline;
+}
+
+/* Edit Form */
+.edit-form {
+    background: var(--black);
+    border: var(--border);
+    border-radius: .5rem;
+    padding: 3rem;
+}
+
+.edit-form .input-group {
+    margin-bottom: 2rem;
+}
+
+.edit-form label {
+    display: block;
+    font-size: 1.6rem;
+    color: var(--main-color);
+    margin-bottom: 1rem;
+}
+
+.edit-form input,
+.edit-form textarea,
+.edit-form select {
+    width: 100%;
+    padding: 1.5rem;
+    font-size: 1.6rem;
+    color: var(--white);
+    background: var(--bg);
+    border: var(--border);
+    border-radius: .5rem;
+}
+
+.edit-form .form-actions {
+    margin-top: 3rem;
+    display: flex;
+    gap: 1rem;
+}
 
 
 
