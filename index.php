@@ -71,18 +71,6 @@ if (isset($_POST['add_to_cart'])) {
 		</nav>
 
 		<div class="icons">
-
-			<div class="search-container">
-				<div class="fas fa-search" id="search-btn"></div>
-				<div class="search-form">
-					<input type="search" id="search-box" name="searchTerm" placeholder="search here...">
-					<label for="search-box" class="fas fa-search"></label>
-				</div>
-			</div>
-
-
-
-			<!-- <div class="fas fa-search" id="search-btn"> -->
 			<div class="fas fa-shopping-cart" id="cart-btn">
 				<?php
 
@@ -101,11 +89,7 @@ if (isset($_POST['add_to_cart'])) {
 			<div class="cart"></div>
 		</div>
 
-		<div class="search-form" >
-
-			<input type="search" id="search-box" placeholder="search here...">
-			<label for="search-box" class="fas fa-search"></label>
-		</div>
+		
 
 		
 	</header>
@@ -141,7 +125,7 @@ if (isset($_POST['add_to_cart'])) {
 	<section class="menu" id="menu">
 		<h1 class="heading"><span>our</span> menu</h1>
 
-		<form action="" method="post" class="search-form">
+		<form action="#menu" method="post" class="search-form">
 			<input type="text" name="searchTerm" placeholder="Cari menu...">
 			<input type="submit" name="search" value="Cari">
 		</form>
