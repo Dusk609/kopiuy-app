@@ -7,23 +7,79 @@ if(!isset($_SESSION['admin_logged_in'])) {
     exit;
 }
 
-// Ambil dan hapus session messages
-$success_message = $_SESSION['success'] ?? null;
-$error_message = $_SESSION['error'] ?? null;
-
-// Hapus messages dari session setelah disimpan ke variabel
-unset($_SESSION['success']);
-unset($_SESSION['error']);
-
-// Ambil ID pesanan dari URL
 $order_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-if($order_id <= 0) {
-    header('Location: orders.php');
-    exit;
+// Fungsi untuk mengurangi stok produk
+function reduceProductStock($pdo, $order_id) {
+    try {
+        // Mulai transaksi
+        $pdo->beginTransaction();
+        
+        // Dapatkan semua item pesanan
+        $stmt = $pdo->prepare("SELECT product_id, quantity FROM order_items WHERE order_id = ?");
+        $stmt->execute([$order_id]);
+        $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Kurangi stok untuk setiap produk
+        foreach ($items as $item) {
+            $update_stmt = $pdo->prepare("UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?");
+            $update_stmt->execute([$item['quantity'], $item['product_id'], $item['quantity']]);
+            
+            if ($update_stmt->rowCount() == 0) {
+                throw new Exception("Stok tidak mencukupi untuk produk ID: " . $item['product_id']);
+            }
+        }
+        
+        // Commit transaksi jika semua berhasil
+        $pdo->commit();
+        return true;
+    } catch (Exception $e) {
+        // Rollback jika ada error
+        $pdo->rollBack();
+        $_SESSION['error'] = $e->getMessage();
+        return false;
+    }
 }
 
-// Ambil detail pesanan
+// Proses update status jika form disubmit
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_status'])) {
+    $new_status = $_POST['status'];
+    
+    try {
+        $pdo = Database::getInstance()->getConnection();
+        
+        // Dapatkan status sebelumnya untuk pengecekan
+        $stmt = $pdo->prepare("SELECT status FROM `order` WHERE id = ?");
+        $stmt->execute([$order_id]);
+        $current_status = $stmt->fetchColumn();
+        
+        // Update status pesanan
+        $update_stmt = $pdo->prepare("UPDATE `order` SET status = ? WHERE id = ?");
+        $update_stmt->execute([$new_status, $order_id]);
+        
+        // Jika status baru adalah 'completed' dan sebelumnya bukan 'completed', kurangi stok
+        if ($new_status == 'completed' && $current_status != 'completed') {
+            if (!reduceProductStock($pdo, $order_id)) {
+                throw new Exception("Gagal mengurangi stok produk");
+            }
+        }
+        
+        $_SESSION['success'] = "Status pesanan berhasil diperbarui";
+        header("Location: order_edit.php?id=" . $order_id);
+        exit;
+        
+    } catch (PDOException $e) {
+        $_SESSION['error'] = "Database error: " . $e->getMessage();
+        header("Location: order_edit.php?id=" . $order_id);
+        exit;
+    } catch (Exception $e) {
+        $_SESSION['error'] = $e->getMessage();
+        header("Location: order_edit.php?id=" . $order_id);
+        exit;
+    }
+}
+
+// Ambil data pesanan
 try {
     $pdo = Database::getInstance()->getConnection();
     
@@ -31,48 +87,29 @@ try {
     $stmt = $pdo->prepare("SELECT o.*, u.username as customer_name 
                           FROM `order` o
                           JOIN `users` u ON o.user_id = u.id
-                          WHERE o.id = :id");
-    $stmt->bindParam(':id', $order_id, PDO::PARAM_INT);
-    $stmt->execute();
+                          WHERE o.id = ?");
+    $stmt->execute([$order_id]);
     $order = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    if(!$order) {
-        header('Location: orders.php');
+    if (!$order) {
+        $_SESSION['error'] = "Pesanan tidak ditemukan";
+        header("Location: orders.php");
         exit;
     }
     
-    // Proses update jika form disubmit
-    if($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $new_status = $_POST['status'] ?? '';
-        $notes = $_POST['notes'] ?? '';
-        
-        // Validasi status
-        $allowed_statuses = ['pending', 'processing', 'completed', 'cancelled'];
-        if(!in_array($new_status, $allowed_statuses)) {
-            $_SESSION['error'] = "Status tidak valid";
-        } else {
-            try {
-                $stmt = $pdo->prepare("UPDATE `order` SET status = :status WHERE id = :id");
-                $stmt->bindParam(':status', $new_status, PDO::PARAM_STR);
-                $stmt->bindParam(':id', $order_id, PDO::PARAM_INT);
-                
-                if($stmt->execute()) {
-                    $_SESSION['success'] = "Pesanan berhasil diperbarui";
-                    header("Location: order_detail.php?id=$order_id");
-                    exit;
-                } else {
-                    $_SESSION['error'] = "Gagal memperbarui pesanan";
-                }
-            } catch (PDOException $e) {
-                $_SESSION['error'] = "Gagal memperbarui pesanan: " . $e->getMessage();
-            }
-        }
-    }
+    // Query untuk item pesanan
+    $items_stmt = $pdo->prepare("SELECT oi.*, p.stock as product_stock 
+                                FROM order_items oi
+                                JOIN products p ON oi.product_id = p.id
+                                WHERE oi.order_id = ?");
+    $items_stmt->execute([$order_id]);
+    $order_items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
     
 } catch (PDOException $e) {
     die("Database error: " . $e->getMessage());
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -213,6 +250,90 @@ try {
         .alert-error i {
             color: #F44336;
         }
+
+        .order-details {
+            background: var(--black);
+            border: var(--border);
+            border-radius: 0.5rem;
+            padding: 2rem;
+            margin-bottom: 3rem;
+        }
+        
+        .detail-row {
+            display: flex;
+            margin-bottom: 1.5rem;
+            font-size: 1.6rem;
+        }
+        
+        .detail-label {
+            font-weight: bold;
+            color: var(--main-color);
+            width: 200px;
+        }
+        
+        .detail-value {
+            color: #fff;
+        }
+        
+        .status-form {
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: var(--border);
+        }
+        
+        .status-select {
+            padding: 0.8rem 1rem;
+            border: var(--border);
+            background: var(--bg);
+            color: #fff;
+            border-radius: 0.5rem;
+            font-size: 1.6rem;
+        }
+        
+        .order-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 3rem;
+        }
+        
+        .order-items-table th, 
+        .order-items-table td {
+            padding: 1.5rem;
+            text-align: left;
+            border-bottom: var(--border);
+            color: #fff;
+        }
+        
+        .order-items-table th {
+            background-color: var(--main-color);
+            color: var(--black);
+        }
+        
+        .notification {
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border-radius: 0.5rem;
+            font-size: 1.6rem;
+        }
+        
+        .notification.success {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            border: 1px solid #4CAF50;
+        }
+        
+        .notification.error {
+            background: rgba(244, 67, 54, 0.2);
+            color: #F44336;
+            border: 1px solid #F44336;
+        }
+        
+        .sub-heading {
+            color: var(--main-color);
+            font-size: 2.5rem;
+            margin: 3rem 0 1.5rem;
+        }
+
     </style>
 </head>
 <body>
@@ -234,63 +355,79 @@ try {
         </div>
     </header>
 
-    <section class="order-edit-container">
-        <h1 class="heading">Edit <span>Pesanan</span> #<?= $order_id ?></h1>
+    <section class="orders-container">
+        <h1 class="heading">Edit <span>Pesanan</span> #<?= $order['id'] ?></h1>
         
-        <?php if($success_message): ?>
-            <div class="alert alert-success">
-                <i class="fas fa-check-circle"></i> <?= htmlspecialchars($success_message) ?>
-            </div>
-        <?php endif; ?>
-
-        <?php if($error_message): ?>
-            <div class="alert alert-error">
-                <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error_message) ?>
+        <?php if(isset($_SESSION['success'])): ?>
+            <div class="notification success">
+                <?= $_SESSION['success']; unset($_SESSION['success']); ?>
             </div>
         <?php endif; ?>
         
-        <form action="" method="POST" class="edit-form">
-            <div class="form-group">
-                <label for="customer" class="form-label">Pelanggan</label>
-                <input type="text" id="customer" class="form-control" value="<?= htmlspecialchars($order['customer_name']) ?>" readonly>
+        <?php if(isset($_SESSION['error'])): ?>
+            <div class="notification error">
+                <?= $_SESSION['error']; unset($_SESSION['error']); ?>
             </div>
-            
-            <div class="form-group">
-                <label for="total" class="form-label">Total Pesanan</label>
-                <input type="text" id="total" class="form-control" value="Rp <?= number_format($order['total_price'], 0, ',', '.') ?>" readonly>
-            </div>
-            
-            <div class="form-group">
-                <label for="date" class="form-label">Tanggal Pesanan</label>
-                <input type="text" id="date" class="form-control" value="<?= date('d M Y H:i', strtotime($order['created_at'])) ?>" readonly>
-            </div>
-            
-            <div class="form-group">
-                <label for="status" class="form-label">Status Pesanan</label>
-                <select name="status" id="status" class="form-control" required>
-                    <option value="pending" <?= $order['status'] == 'pending' ? 'selected' : '' ?>>Pending</option>
-                    <option value="processing" <?= $order['status'] == 'processing' ? 'selected' : '' ?>>Processing</option>
-                    <option value="completed" <?= $order['status'] == 'completed' ? 'selected' : '' ?>>Completed</option>
-                    <option value="cancelled" <?= $order['status'] == 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="notes" class="form-label">Catatan</label>
-                <textarea name="notes" id="notes" class="form-control"><?= htmlspecialchars($order['notes'] ?? '') ?></textarea>
-            </div>
-            
-            <div class="form-group" style="text-align: center; margin-top: 3rem;">
-                <button type="submit" class="btn">
-                    <i class="fas fa-save"></i> Simpan Perubahan
-                </button>
-            </div>
-        </form>
+        <?php endif; ?>
         
-        <div style="text-align: center;">
-            <a href="order_detail.php?id=<?= $order_id ?>" class="btn-back">
-                <i class="fas fa-arrow-left"></i> Kembali ke Detail Pesanan
-            </a>
+        <div class="order-details">
+            <div class="detail-row">
+                <span class="detail-label">Pelanggan:</span>
+                <span class="detail-value"><?= htmlspecialchars($order['customer_name']) ?></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Tanggal Pesanan:</span>
+                <span class="detail-value"><?= date('d M Y H:i', strtotime($order['created_at'])) ?></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Total Harga:</span>
+                <span class="detail-value">Rp <?= number_format($order['total_price'], 0, ',', '.') ?></span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Metode Pembayaran:</span>
+                <span class="detail-value"><?= strtoupper($order['payment_method']) ?></span>
+            </div>
+            
+            <form method="post" class="status-form">
+                <div class="detail-row">
+                    <span class="detail-label">Status:</span>
+                    <select name="status" class="status-select">
+                        <option value="pending" <?= $order['status'] == 'pending' ? 'selected' : '' ?>>Pending</option>
+                        <option value="processing" <?= $order['status'] == 'processing' ? 'selected' : '' ?>>Processing</option>
+                        <option value="completed" <?= $order['status'] == 'completed' ? 'selected' : '' ?>>Completed</option>
+                        <option value="cancelled" <?= $order['status'] == 'cancelled' ? 'selected' : '' ?>>Cancelled</option>
+                    </select>
+                </div>
+                <button type="submit" name="update_status" class="btn btn-primary">Update Status</button>
+            </form>
+        </div>
+        
+        <h2 class="sub-heading">Item Pesanan</h2>
+        <table class="order-items-table">
+            <thead>
+                <tr>
+                    <th>Produk</th>
+                    <th>Harga</th>
+                    <th>Jumlah</th>
+                    <th>Subtotal</th>
+                    <th>Stok Tersedia</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach($order_items as $item): ?>
+                <tr>
+                    <td><?= htmlspecialchars($item['product_name']) ?></td>
+                    <td>Rp <?= number_format($item['price'], 0, ',', '.') ?></td>
+                    <td><?= $item['quantity'] ?></td>
+                    <td>Rp <?= number_format($item['price'] * $item['quantity'], 0, ',', '.') ?></td>
+                    <td><?= $item['product_stock'] ?></td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        
+        <div class="action-buttons">
+            <a href="orders.php" class="btn btn-secondary">Kembali ke Daftar Pesanan</a>
         </div>
     </section>
 

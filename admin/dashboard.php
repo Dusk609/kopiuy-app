@@ -354,15 +354,14 @@ try {
         </a>
         
         <nav class="navbar">
-            <a href="dashboard.php" class="active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+            <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
             <a href="products.php"><i class="fas fa-coffee"></i> Produk</a>
             <a href="orders.php"><i class="fas fa-shopping-cart"></i> Pesanan</a>
             <a href="customers.php"><i class="fas fa-users"></i> Pelanggan</a>
-            <a href="reports.php"><i class="fas fa-chart-bar"></i> Laporan</a>
+            <a href="revenue_report.php" class="active"><i class="fas fa-money-bill-wave"></i> Pendapatan</a>
         </nav>
         
         <div class="icons">
-            <div class="fas fa-bell" id="notification-btn"></div>
             <div class="fas fa-user"></div>
             <a href="logout.php" class="fas fa-sign-out-alt"></a>
         </div>
@@ -379,15 +378,7 @@ try {
         
         <!-- Stat Cards -->
         <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-shopping-bag"></i></div>
-                <h3 class="stat-title">Total Pesanan</h3>
-                <div class="stat-value"><?= number_format($stats['total_orders']) ?></div>
-                <a href="orders.php" class="stat-link">
-                    Lihat detail <i class="fas fa-arrow-right"></i>
-                </a>
-            </div>
-            
+
             <div class="stat-card">
                 <div class="stat-icon"><i class="fas fa-coffee"></i></div> <!-- Ganti icon sesuai kebutuhan -->
                 <h3 class="stat-title">Total Produk</h3>
@@ -396,13 +387,13 @@ try {
                     Kelola produk <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
-            
+
             <div class="stat-card">
-                <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
-                <h3 class="stat-title">Total Pendapatan</h3>
-                <div class="stat-value">Rp <?= number_format($stats['total_revenue'], 0, ',', '.') ?></div>
-                <a href="reports.php" class="stat-link">
-                    Lihat laporan <i class="fas fa-arrow-right"></i>
+                <div class="stat-icon"><i class="fas fa-shopping-bag"></i></div>
+                <h3 class="stat-title">Total Pesanan</h3>
+                <div class="stat-value"><?= number_format($stats['total_orders']) ?></div>
+                <a href="orders.php" class="stat-link">
+                    Lihat detail <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
             
@@ -414,14 +405,16 @@ try {
                     Lihat pelanggan <i class="fas fa-arrow-right"></i>
                 </a>
             </div>
-        </div>
-        
-        <!-- Revenue Chart -->
-        <div class="dashboard-section">
-            <h2 class="section-title"><i class="fas fa-chart-line"></i> Grafik Pendapatan 6 Bulan Terakhir</h2>
-            <div class="chart-container">
-                <canvas id="revenueChart"></canvas>
+
+            <div class="stat-card">
+                <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                <h3 class="stat-title">Total Pendapatan</h3>
+                <div class="stat-value">Rp <?= number_format($stats['total_revenue'], 0, ',', '.') ?></div>
+                <a href="revenue_report.php" class="stat-link">
+                    Lihat laporan <i class="fas fa-arrow-right"></i>
+                </a>
             </div>
+            
         </div>
         
         <!-- Recent Orders -->
@@ -470,7 +463,7 @@ try {
     <!-- Footer -->
     <section class="footer">
         <div class="credit">
-            <p>KopiUy Admin Panel &copy; <?= date('Y') ?> | Dibuat dengan <i class="fas fa-heart"></i> oleh Tim KopiUy</p>
+            <p>KopiUy Admin Panel &copy; <?= date('Y') ?></p>
         </div>
     </section>
 

@@ -89,3 +89,22 @@ $conn->set_charset("utf8mb4");
 function sanitizeInput($conn, $data){
     return $conn->real_escape_string(trim($data));
 }
+
+function updateProductStock($product_id, $quantity, $conn) {
+    // Decrease product stock
+    $update_stock = $conn->prepare("UPDATE products SET stock = stock - ? WHERE id = ?");
+    $update_stock->bind_param("ii", $quantity, $product_id);
+    return $update_stock->execute();
+}
+function reduceProductStock($conn, $order_id) {
+    // Ambil semua item dari pesanan
+    $items_query = mysqli_query($conn, "SELECT product_id, quantity FROM order_items WHERE order_id = '$order_id'");
+    
+    while ($item = mysqli_fetch_assoc($items_query)) {
+        $product_id = $item['product_id'];
+        $quantity = $item['quantity'];
+        
+        // Kurangi stok produk
+        mysqli_query($conn, "UPDATE products SET stock = stock - $quantity WHERE id = '$product_id'");
+    }
+}

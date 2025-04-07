@@ -161,6 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_btn'])) {
             border-radius: 5px;
         }
         .address-select {
+            color: var(--white);
             margin-bottom: 2rem;
         }
         .address-select select {

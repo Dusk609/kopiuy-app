@@ -201,11 +201,11 @@ try {
         </a>
         
         <nav class="navbar">
-            <a href="dashboard.php">Dashboard</a>
-            <a href="products.php" class="active">Produk</a>
-            <a href="orders.php">Pesanan</a>
-            <a href="customers.php">Pelanggan</a>
-            <a href="reports.php">Laporan</a>
+            <a href="dashboard.php"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+            <a href="products.php"><i class="fas fa-coffee"></i> Produk</a>
+            <a href="orders.php"><i class="fas fa-shopping-cart"></i> Pesanan</a>
+            <a href="customers.php"><i class="fas fa-users"></i> Pelanggan</a>
+            <a href="revenue_report.php" class="active"><i class="fas fa-money-bill-wave"></i> Pendapatan</a>
         </nav>
         
         <div class="icons">
