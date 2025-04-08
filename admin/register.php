@@ -1,46 +1,60 @@
 <?php
 session_start();
 
-// Tampilkan notifikasi jika registrasi berhasil
-if (isset($_SESSION['registration_success'])) {
-    $success_message = "Registrasi berhasil! Akun " . htmlspecialchars($_SESSION['registered_username']) . " telah dibuat. Silakan login.";
-    unset($_SESSION['registration_success']);
-    unset($_SESSION['registered_username']);
+// Redirect jika sudah login
+if (isset($_SESSION['admin_logged_in'])) {
+    header("Location: dashboard.php");
+    exit();
 }
 
-// Proses login
+// Proses registrasi
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     require '../config/database.php';
     
-    $username = $_POST['username'];
+    $username = trim($_POST['username']);
     $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+    $name = trim($_POST['name']);
+    $email = trim($_POST['email']);
     
-    try {
-        $pdo = Database::getInstance()->getConnection();
-        $stmt = $pdo->prepare("SELECT * FROM admins WHERE username = ? LIMIT 1");
-        $stmt->execute([$username]);
-        $admin = $stmt->fetch();
-        
-        if ($admin && password_verify($password, $admin['password'])) {
-            $_SESSION['admin_logged_in'] = true;
-            $_SESSION['admin_id'] = $admin['id'];
-            $_SESSION['admin_username'] = $admin['username'];
-            $_SESSION['admin_name'] = $admin['name'];
-            $_SESSION['admin_email'] = $admin['email'];
-            $_SESSION['admin_role'] = $admin['role'];
-            $_SESSION['last_login'] = date('Y-m-d H:i:s');
+    // Validasi
+    if (empty($username) || empty($password) || empty($confirm_password) || empty($name) || empty($email)) {
+        $error = "Semua field harus diisi";
+    } elseif ($password !== $confirm_password) {
+        $error = "Password dan konfirmasi password tidak cocok";
+    } elseif (strlen($password) < 8) {
+        $error = "Password minimal 8 karakter";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Format email tidak valid";
+    } else {
+        try {
+            $pdo = Database::getInstance()->getConnection();
             
-            // Update last login
-            $stmt = $pdo->prepare("UPDATE admins SET last_login = NOW() WHERE id = ?");
-            $stmt->execute([$admin['id']]);
+            // Cek apakah username atau email sudah ada
+            $stmt = $pdo->prepare("SELECT id FROM admins WHERE username = ? OR email = ?");
+            $stmt->execute([$username, $email]);
             
-            header("Location: dashboard.php");
-            exit();
-        } else {
-            $error = "Username atau password salah";
+            if ($stmt->fetch()) {
+                $error = "Username atau email sudah digunakan";
+            } else {
+                // Hash password
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                
+                // Insert admin baru
+                $stmt = $pdo->prepare("INSERT INTO admins (username, password, name, email, role, created_at) 
+                                      VALUES (?, ?, ?, ?, 'admin', NOW())");
+                $stmt->execute([$username, $hashed_password, $name, $email]);
+                
+                // Set session untuk notifikasi
+                $_SESSION['registration_success'] = true;
+                $_SESSION['registered_username'] = $username;
+                
+                header("Location: login.php");
+                exit();
+            }
+        } catch (PDOException $e) {
+            $error = "Terjadi kesalahan sistem: " . $e->getMessage();
         }
-    } catch (PDOException $e) {
-        $error = "Terjadi kesalahan sistem";
     }
 }
 ?>
@@ -120,7 +134,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             margin-bottom: 1.5rem;
             display: <?= isset($error) ? 'block' : 'none' ?>;
         }
-
         .auth-links {
             text-align: center;
             margin-top: 2rem;
@@ -146,45 +159,34 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             font-size: 1.2rem;
         }
 
-        .success-message {
-            color: var(--success-color);
-            font-size: 1.4rem;
-            text-align: center;
-            margin-bottom: 1.5rem;
-            background-color: rgba(40, 167, 69, 0.1);
-            padding: 1rem;
-            border-radius: .5rem;
-            border: 1px solid var(--success-color);
-        }
-
-        .success-message i {
-            margin-right: 0.5rem;
-        }
-
+        /* Jika ingin menambahkan variabel warna hover */
         :root {
-            --main-color-hover: #d4a762; 
-            --success-color: #28a745;
+            --main-color-hover: #d4a762; /* Warna yang sedikit lebih terang/muda */
         }
-
     </style>
 </head>
 <body>
     <div class="login-container">
         <div class="login-box">
-            <h2>Login Admin</h2>
+            <h2>Register Admin</h2>
             
             <?php if (isset($error)): ?>
                 <div class="error-message">
                     <i class="fas fa-exclamation-circle"></i> <?= $error ?>
                 </div>
             <?php endif; ?>
-            <?php if (isset($success_message)): ?>
-                <div class="success-message">
-                    <i class="fas fa-check-circle"></i> <?= $success_message ?>
-                </div>
-            <?php endif; ?>
             
-            <form action="login.php" method="post">
+            <form action="register.php" method="post">
+                <div class="input-group">
+                    <label for="name"><i class="fas fa-user"></i> Nama Lengkap</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                
+                <div class="input-group">
+                    <label for="email"><i class="fas fa-envelope"></i> Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                
                 <div class="input-group">
                     <label for="username"><i class="fas fa-user"></i> Username</label>
                     <input type="text" id="username" name="username" required>
@@ -192,15 +194,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 
                 <div class="input-group">
                     <label for="password"><i class="fas fa-lock"></i> Password</label>
-                    <input type="password" id="password" name="password" required>
+                    <input type="password" id="password" name="password" required minlength="8">
+                </div>
+                
+                <div class="input-group">
+                    <label for="confirm_password"><i class="fas fa-lock"></i> Konfirmasi Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" required minlength="8">
                 </div>
                 
                 <button type="submit" class="btn btn-login">
-                    <i class="fas fa-sign-in-alt"></i> Login
+                    <i class="fas fa-user-plus"></i> Register
                 </button>
             </form>
             <div class="auth-links">
-                Belum punya akun? <a href="register.php"><i class="fas fa-user-plus"></i> Register disini</a>
+                Sudah punya akun? <a href="login.php"><i class="fas fa-sign-in-alt"></i> Login disini</a>
             </div>
         </div>
     </div>
